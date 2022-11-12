@@ -132,5 +132,36 @@ app.delete("/messages/:id", async (req, res) => {
 
 })
 
+app.put("/messages/:id", async (req, res) => {
+    
+    const validation = messageSchema.validate(req.body)
+    const user = req.headers.user;
+    if(validation.error) {
+        res.status(422).send(validation.error.details.map(detail => detail.message))
+        return;
+    }
+    
+    const participantExist = await db.collection("users").findOne({name: req.headers.user})
+    if(!participantExist) {
+        res.status(422).send("'from' user does not exist");
+        return;
+    }
+
+    const id = req.params.id;
+    const message = await db.collection("messages").findOne({_id: ObjectId(id)})
+    if(!message) {
+        res.status(404).send()
+        return;
+    }
+    if(message.from !== user) {
+        res.status(401).send()
+        return;
+    }
+    db.collection("messages").updateOne({_id: ObjectId(id)}, {$set: {...message, "text": req.body.text}})
+
+    res.status(201).send("OK")
+
+})
+
 setInterval(clearRegister, 15000)
 app.listen(5000)
