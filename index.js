@@ -1,16 +1,16 @@
 import express from "express"
 import cors from "cors"
-import {MongoClient} from "mongodb"
+import dotenv from "dotenv"
+import {MongoClient, ObjectId} from "mongodb"
 import { messageSchema, userSchema } from "./schemas.js"
 import dayjs from "dayjs"
-import { networkInterfaces } from "os"
-import path from "path"
 
 const app = express()
 app.use(cors())
 app.use(express.json())
+dotenv.config()
 
-const mongoClient = new MongoClient("mongodb://localhost:27017");
+const mongoClient = new MongoClient(process.env.MONGO_URL);
 let db;
 
 await mongoClient.connect()
@@ -79,8 +79,7 @@ app.get("/messages", async (req, res) => {
     const send_messages = []
     for(let i = messages.length-1; i >= 0 && limit; i--) 
         if(messages[i].to == "Todos" || messages[i].to == user || messages[i].from == user) {
-            const {_id, ...messageObject} = messages[i]
-            send_messages.push(messageObject)
+            send_messages.push(messages[i])
             limit--;
         }
     res.status(200).send(send_messages.reverse())
@@ -114,6 +113,24 @@ async function clearRegister() {
         }
     })
 }
+
+app.delete("/messages/:id", async (req, res) => {
+    const user = req.headers.user;
+    const id = req.params.id;
+    
+    const message = await db.collection("messages").findOne({_id: ObjectId(id)})
+    if(!message) {
+        res.status(404).send()
+        return;
+    }
+    if(message.from !== user) {
+        res.status(401).send()
+        return;
+    }
+    db.collection("messages").deleteOne({_id: ObjectId(id)})
+    res.status(200).send()
+
+})
 
 setInterval(clearRegister, 15000)
 app.listen(5000)
