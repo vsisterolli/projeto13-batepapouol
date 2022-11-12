@@ -28,7 +28,7 @@ app.post("/participants", async (req, res) => {
         res.status(409).send("User already exist")
         return
     }
-    db.collection("users").insertOne({...req.body, "lastStatus": dayjs()})
+    db.collection("users").insertOne({...req.body, "lastStatus": Date.now()})
     db.collection("messages").insertOne({
         "from": req.body.name,
         "to": "Todos",
@@ -42,7 +42,8 @@ app.post("/participants", async (req, res) => {
 
 app.get("/participants", async (req, res) => {
     const users = await db.collection("users").find({}).toArray();
-    res.send(users.map(users => users.name))
+    const sentableUsers = users.map(value => {return {"name": value.name}})
+    res.send(sentableUsers)
 })
 
 app.post("/messages", async (req, res) => {
@@ -82,7 +83,7 @@ app.get("/messages", async (req, res) => {
             send_messages.push(messageObject)
             limit--;
         }
-    res.status(200).send(send_messages)
+    res.status(200).send(send_messages.reverse())
 
 })
 
@@ -94,15 +95,23 @@ app.post("/status", async (req, res) => {
         return
     }
     await db.collection("users").updateOne({_id: userData._id}, 
-                                {$set: {...userData, lastStatus: dayjs()}} )
+                                {$set: {...userData, lastStatus: Date.now()}} )
     res.status(200).send(userData)
 })
 
 async function clearRegister() {
     const participants = await db.collection("users").find({}).toArray();
     participants.map(element => {
-        if(dayjs() - element.lastStatus <= 10)
+        if(dayjs().unix() - dayjs(element.lastStatus).unix() > 10) {
             db.collection("users").deleteOne({_id: element._id})
+            db.collection("messages").insertOne({
+                "from": element.name,
+                "to": "Todos",
+                "text": "sai da sala...",
+                "type": "status",
+                "time": dayjs().format("HH:MM:ss")
+            })
+        }
     })
 }
 
